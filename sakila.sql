@@ -71,7 +71,26 @@ FROM actor
 WHERE last_name LIKE 'WILLIAMS';
 
 -- 5a. You cannot locate the schema of the `address` table. Which query would you use to re-create it?
+-- show schema and show table
+-- create table
+SHOW CREATE TABLE sakila.address;
 
+CREATE TABLE `address` (
+   `address_id` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
+   `address` varchar(50) NOT NULL,
+   `address2` varchar(50) DEFAULT NULL,
+   `district` varchar(20) NOT NULL,
+   `city_id` smallint(5) unsigned NOT NULL,
+   `postal_code` varchar(10) DEFAULT NULL,
+   `phone` varchar(20) NOT NULL,
+   `location` geometry NOT NULL,
+   `last_update` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+   PRIMARY KEY (`address_id`),
+   KEY `idx_fk_city_id` (`city_id`),
+   SPATIAL KEY `idx_location` (`location`),
+   CONSTRAINT `fk_address_city` FOREIGN KEY (`city_id`) REFERENCES `city` (`city_id`) ON UPDATE CASCADE
+ ) ENGINE=InnoDB AUTO_INCREMENT=606 DEFAULT CHARSET=utf8;
+ 
 
 -- 6a. Use `JOIN` to display the first and last names, as well as the address, of each staff member. Use the tables `staff` and `address`:
 SELECT first_name, last_name, address 
@@ -155,110 +174,48 @@ WHERE `name` = 'Family'
 ));
 
 -- 7e. Display the most frequently rented movies in descending order.
+SELECT film_id, title, COUNT(film_id) AS 'popularity'
+FROM rental r, inventory i, film f
+WHERE r.inventory_id  = i.inventory_id AND i.film_id = f.film_id
+GROUP BY film_id, 'popularity' DESC;
 
--- 7f. Write a query to display how much business, in dollars, each store brought in.
-
--- 7g. Write a query to display for each store its store ID, city, and country.
-
--- 7h. List the top five genres in gross revenue in descending order. (**Hint**: you may need to use the following tables: category, film_category, inventory, payment, and rental.)
-
--- 8a. In your new role as an executive, you would like to have an easy way of viewing the Top five genres by gross revenue. Use the solution from the problem above to create a view. If you haven't solved 7h, you can substitute another query to create a view.
-
--- 8b. How would you display the view that you created in 8a?
-
--- 8c. You find that you no longer need the view `top_five_genres`. Write a query to delete it.
-
-SELECT city, city_id
-FROM city
-WHERE city IN ('Qalyub', 'Qinhuangdao', 'Qomsheh', 'Quilmes');
-
-SELECT *
-FROM address
-WHERE city_id in
-(
-	SELECT city_id
-    FROM city
-    WHERE city IN ('Qalyub', 'Qinhuangdao', 'Qomsheh', 'Quilmes')
-);
-
-SELECT * FROM address;
-
-SELECT * FROM city;
-
-SELECT district, city
-FROM address a , city c
-WHERE a.city_id = c.city_id
-AND a.city_id IN
-(
-	SELECT city_id
-    FROM city
-    WHERE city IN ('Qalyub', 'Qinhuangdao', 'Qomsheh', 'Quilmes')
-);
-
-
-SELECT * 
-FROM film f
-INNER JOIN film_actor fa
-ON (f.film_id  = fa.film_id);
-
-
-SELECT fa.* 
-FROM film f
-LEFT OUTER JOIN film_actor fa
-ON (f.film_id  = fa.film_id)
-WHERE fa.film_id IS NULL;
-
-SELECT fa.* 
-FROM film f
-RIGHT OUTER JOIN film_actor fa
-ON (f.film_id  = fa.film_id)
-WHERE fa.film_id IS NULL;
-
-SELECT *
-FROM actor
-WHERE first_name LIKE 'b__' AND last_name LIKE 'wi_l__';
-
-SELECT COUNT(*) AS 'Ben Willis Actors'
-FROM actor
-WHERE first_name LIKE 'b__' AND last_name LIKE 'wi%';
+SELECT title,
+( SELECT film_id FROM inventory WHERE film.film_id = inventory.film_id ) AS 'Film ID',
+( SELECT COUNT(*) FROM rental WHERE inventory.inventory_id = rental.inventory_id ) AS 'Popularity'
+FROM film, rental;
 
 SELECT title,
 ( SELECT COUNT(*) FROM inventory WHERE film.film_id = inventory.film_id ) AS 'Number of copies'
 FROM film;
 
-SELECT COUNT(*)
-FROM customer
-WHERE customer_id IN (
-SELECT customer_id
-FROM payment
-WHERE rental_id IN (
-SELECT rental_id
-FROM rental
-WHERE inventory_id IN (
-SELECT inventory_id
-FROM inventory
-WHERE film_id IN (
-SELECT film_id
-FROM film
-WHERE title = 'AFRICAN EGG'
-))));
+-- 7f. Write a query to display how much business, in dollars, each store brought in.
 
-SELECT COUNT(*) AS 'Actors in Alter Victory'
-FROM actor
-WHERE actor_id IN (
-SELECT actor_id
-FROM film_actor
-WHERE film_id IN (
-SELECT film_id
-FROM film
-WHERE title = 'ALTER VICTORY'
-));
+-- 7g. Write a query to display for each store its store ID, city, and country.
 
-SELECT * FROM report;
+SELECT * FROM store;
 
-DROP VIEW report;
+SELECT store.store_id, city.city, country.country 
+FROM store 
+INNER JOIN address ON store.address_id = address.address_id 
+INNER JOIN city ON address.city_id = city.city_id 
+INNER JOIN country ON city.country_id = country.country_id;
 
-CREATE VIEW report AS (
+-- 7h. List the top five genres in gross revenue in descending order. (**Hint**: you may need to use the following tables: category, film_category, inventory, payment, and rental.)
+SELECT * FROM category;
+
+SELECT * FROM
+(SELECT category.category_id, category.name AS 'GENRE', COUNT(payment.amount) AS 'GROSS REVENUE'
+FROM category
+INNER JOIN film_category ON category.category_id = film_category.category_id
+INNER JOIN inventory ON film_category.film_id = inventory.film_id
+INNER JOIN rental ON inventory.inventory_id = rental.inventory_id 
+INNER JOIN payment ON rental.rental_id = payment.rental_id
+GROUP BY category_id) t
+ORDER BY 'GROSS REVENUE' DESC;
+LIMIT 5;
+
+-- 8a. In your new role as an executive, you would like to have an easy way of viewing the Top five genres by gross revenue. Use the solution from the problem above to create a view. If you haven't solved 7h, you can substitute another query to create a view.
+CREATE VIEW top_five_genres AS (
 SELECT district, city
 FROM address a , city c
 WHERE a.city_id = c.city_id
@@ -269,6 +226,15 @@ AND a.city_id IN
     WHERE city IN ('Qalyub', 'Qinhuangdao', 'Qomsheh', 'Quilmes')
 ) );
 
-SELECT * FROM report;
+-- 8b. How would you display the view that you created in 8a?
+SELECT * FROM top_five_genres;
 
-DROP VIEW report;
+-- 8c. You find that you no longer need the view `top_five_genres`. Write a query to delete it.
+DROP VIEW top_five_genres;
+
+
+
+
+
+
+
