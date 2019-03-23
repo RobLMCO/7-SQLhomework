@@ -51,10 +51,9 @@ FROM actor
 GROUP BY actor.last_name DESC;
 
 -- 4b. List last names of actors and the number of actors who have that last name, but only for names that are shared by at least two actors
-SELECT last_name, COUNT(last_name), COUNT(last_name) > 1 AS 'At Least Two Actor Last Names The Same'
+SELECT last_name, COUNT(last_name)
 FROM actor 
-GROUP BY actor.last_name DESC;
-
+GROUP BY actor.last_name HAVING COUNT(*) >=2;
 
 -- 4c. The actor `HARPO WILLIAMS` was accidentally entered in the `actor` table as `GROUCHO WILLIAMS`. Write a query to fix the record.
 UPDATE actor SET first_name=REPLACE(first_name,'GROUCHO','HARPO') WHERE last_name = 'WILLIAMS';
@@ -125,7 +124,8 @@ SELECT last_name, SUM(amount) AS "Total amount paid"
 FROM customer c
 INNER JOIN payment p
 ON (c.customer_id  = p.customer_id)
-GROUP BY c.last_name DESC;
+GROUP BY c.last_name 
+ORDER BY c.last_name ASC;
 
 -- 7a. The music of Queen and Kris Kristofferson have seen an unlikely resurgence. As an unintended consequence, films starting with the letters `K` and `Q` have also soared in popularity. Use subqueries to display the titles of movies starting with the letters `K` and `Q` whose language is English.
 SELECT title, `name` AS 'Film Langauge'
@@ -174,21 +174,26 @@ WHERE `name` = 'Family'
 ));
 
 -- 7e. Display the most frequently rented movies in descending order.
-SELECT film_id, title, COUNT(film_id) AS 'popularity'
-FROM rental r, inventory i, film f
-WHERE r.inventory_id  = i.inventory_id AND i.film_id = f.film_id
-GROUP BY film_id, 'popularity' DESC;
-
-SELECT title,
-( SELECT film_id FROM inventory WHERE film.film_id = inventory.film_id ) AS 'Film ID',
-( SELECT COUNT(*) FROM rental WHERE inventory.inventory_id = rental.inventory_id ) AS 'Popularity'
-FROM film, rental;
-
-SELECT title,
-( SELECT COUNT(*) FROM inventory WHERE film.film_id = inventory.film_id ) AS 'Number of copies'
-FROM film;
+SELECT f.title, COUNT(f.title) AS 'popularity'
+FROM rental AS r 
+JOIN inventory AS i
+ON r.inventory_id  = i.inventory_id 
+JOIN film AS f
+ON i.film_id = f.film_id
+GROUP BY f.title
+ORDER BY COUNT(f.title) DESC;
 
 -- 7f. Write a query to display how much business, in dollars, each store brought in.
+SELECT s.store_id, SUM(amount) as "Total Sales" 
+FROM payment AS p
+JOIN rental AS r
+ON (p.rental_id = r.rental_id)
+JOIN inventory i
+ON (i.inventory_id = r.inventory_id)
+JOIN store AS s
+ON (s.store_id = i.store_id)
+GROUP BY s.store_id;
+
 
 -- 7g. Write a query to display for each store its store ID, city, and country.
 
@@ -203,28 +208,30 @@ INNER JOIN country ON city.country_id = country.country_id;
 -- 7h. List the top five genres in gross revenue in descending order. (**Hint**: you may need to use the following tables: category, film_category, inventory, payment, and rental.)
 SELECT * FROM category;
 
-SELECT * FROM
-(SELECT category.category_id, category.name AS 'GENRE', COUNT(payment.amount) AS 'GROSS REVENUE'
+
+SELECT category.category_id, category.name AS 'GENRE', COUNT(payment.amount) AS 'GROSS REVENUE'
 FROM category
 INNER JOIN film_category ON category.category_id = film_category.category_id
 INNER JOIN inventory ON film_category.film_id = inventory.film_id
 INNER JOIN rental ON inventory.inventory_id = rental.inventory_id 
 INNER JOIN payment ON rental.rental_id = payment.rental_id
-GROUP BY category_id) t
-ORDER BY 'GROSS REVENUE' DESC;
+GROUP BY category_id DESC
+ORDER BY COUNT(payment.amount) DESC
 LIMIT 5;
+
 
 -- 8a. In your new role as an executive, you would like to have an easy way of viewing the Top five genres by gross revenue. Use the solution from the problem above to create a view. If you haven't solved 7h, you can substitute another query to create a view.
 CREATE VIEW top_five_genres AS (
-SELECT district, city
-FROM address a , city c
-WHERE a.city_id = c.city_id
-AND a.city_id IN
-(
-	SELECT city_id
-    FROM city
-    WHERE city IN ('Qalyub', 'Qinhuangdao', 'Qomsheh', 'Quilmes')
-) );
+SELECT category.category_id, category.name AS 'GENRE', COUNT(payment.amount) AS 'GROSS REVENUE'
+FROM category
+INNER JOIN film_category ON category.category_id = film_category.category_id
+INNER JOIN inventory ON film_category.film_id = inventory.film_id
+INNER JOIN rental ON inventory.inventory_id = rental.inventory_id 
+INNER JOIN payment ON rental.rental_id = payment.rental_id
+GROUP BY category_id DESC
+ORDER BY COUNT(payment.amount) DESC
+LIMIT 5 
+);
 
 -- 8b. How would you display the view that you created in 8a?
 SELECT * FROM top_five_genres;
